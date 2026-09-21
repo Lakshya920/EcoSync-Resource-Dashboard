@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>EcoSync | Smart Water Grid</title>
+    <!-- Import Modern Fonts and Chart.js -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <noscript><style>.reveal { opacity: 1; transform: none; }</style></noscript>
+    <style>
+        :root {
+            --bg-base: #020617;
+            --glass-bg: rgba(30, 41, 59, 0.4);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #0ea5e9;
+            --accent-glow: rgba(14, 165, 233, 0.5);
+            --danger: #ef4444;
+            --success: #10b981;
+            --warn: #f59e0b;
+            --ease: cubic-bezier(0.5, 0, 0, 1);
+            --snap: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            overflow-x: hidden;
+            min-height: 100vh;
+            background-attachment: fixed;
+            background-image:
+                radial-gradient(circle at 15% 50%, rgba(14, 165, 233, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.05), transparent 25%);
+        }
+
+        /* --- UI Components --- */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+
+        /* --- Scroll Animations --- */
+        /* Delay is a variable so cards that add their own transitions (hover) keep the stagger. */
+        .reveal {
+            opacity: 0; transform: translateY(40px);
+            transition: opacity 0.8s var(--ease) var(--d, 0s), transform 0.8s var(--ease) var(--d, 0s);
+        }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+        .delay-1 { --d: 150ms; }
+        .delay-2 { --d: 300ms; }
+
+        /* --- Navbar --- */
+        nav {
+            position: fixed; top: 0; width: 100%; z-index: 100;
+            background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1rem 0;
+        }
+        .nav-content { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto; padding: 0 2rem;}
+        .logo { font-weight: 800; font-size: 1.2rem; color: white; display: flex; align-items: center; gap: 8px;}
+
+        /* Connection indicator: colour and pulse follow the real SSE connection state */
+        .live-indicator { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--success); font-weight: 600; transition: color 0.3s; }
+        .live-indicator[data-state="connecting"] { color: var(--warn); }
+        .live-indicator[data-state="offline"] { color: var(--danger); }
+        .pulse { width: 8px; height: 8px; background: currentColor; border-radius: 50%; box-shadow: 0 0 10px currentColor; animation: blink 1.5s infinite; }
+        .live-indicator[data-state="offline"] .pulse { animation: none; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* --- Hero Section --- */
+        .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; text-align: center; padding-top: 60px; }
+        .badge { background: rgba(14, 165, 233, 0.1); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: inline-block; margin-bottom: 1.5rem; box-shadow: 0 0 16px rgba(14, 165, 233, 0.25); }
+        h1 { font-size: 4rem; line-height: 1.1; margin-bottom: 1.5rem; font-weight: 800; letter-spacing: -1px; }
+        .gradient-text { background: linear-gradient(90deg, #fff, var(--text-muted)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero p { color: var(--text-muted); font-size: 1.2rem; max-width: 600px; margin: 0 auto 3rem auto; line-height: 1.6; }
+
+        /* --- Narrative / How It Works --- */
+        .workflow-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 6rem; }
+        .step-card {
+            text-align: left; padding: 2rem; border-radius: 16px;
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            /* Reveal (opacity/transform) and hover (translate) are separate properties so neither cancels the other */
+            transition: opacity 0.8s var(--ease) var(--d, 0s), transform 0.8s var(--ease) var(--d, 0s),
+                        translate 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .step-card:hover { translate: 0 -5px; border-color: rgba(14, 165, 233, 0.3); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3), 0 0 24px rgba(14, 165, 233, 0.12); }
+        .step-icon { font-size: 2rem; margin-bottom: 1rem; background: rgba(255,255,255,0.05); width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid var(--glass-border);}
+
+        /* --- Dashboard Grid --- */
+        .dashboard-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 1.5rem; margin-bottom: 4rem; align-items: start; }
+        .dashboard-grid > * { min-width: 0; } /* lets the chart shrink inside the grid instead of overflowing */
+
+        /* Chart.js needs a dedicated, relatively positioned container with a fixed height */
+        .chart-wrap { position: relative; height: 380px; }
+        .chart-wrap canvas { position: absolute; inset: 0; }
+        .chart-fallback { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; padding: 2rem 0; }
+
+        /* --- Controls: tactile valve toggles --- */
+        .control-group { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+        .valve-btn {
+            --tone: var(--success);
+            --tone-bg: rgba(16, 185, 129, 0.22);
+            --tone-glow: rgba(16, 185, 129, 0.55);
+            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.6rem 1rem;
+            width: 100%; padding: 1rem 1.25rem; border-radius: 12px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.35));
+            border: 1px solid var(--glass-border); border-left: 4px solid var(--tone);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+            color: var(--text-main); font-size: 1rem; font-weight: 600; text-align: left; cursor: pointer;
+            transition: transform 0.12s ease, box-shadow 0.2s ease, border-color 0.3s ease, background 0.2s ease;
+        }
+        .valve-btn.btn-open { --tone: var(--success); --tone-bg: rgba(16, 185, 129, 0.22); --tone-glow: rgba(16, 185, 129, 0.55); }
+        .valve-btn.btn-shut { --tone: var(--danger);  --tone-bg: rgba(239, 68, 68, 0.22);  --tone-glow: rgba(239, 68, 68, 0.55); }
+        .valve-btn:hover { background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.3)); }
+        .valve-btn:active { transform: translateY(1px); box-shadow: 0 1px 4px rgba(0,0,0,0.4), inset 0 2px 6px rgba(0,0,0,0.45); }
+        .valve-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .valve-btn.is-pending { cursor: progress; }
+
+        .valve-name { flex: 1 1 auto; white-space: nowrap; }
+        .valve-state { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        .valve-status { font-size: 0.85rem; font-weight: 700; letter-spacing: 0.5px; color: var(--tone); min-width: 4.75rem; text-align: right; transition: color 0.25s ease; }
+
+        .switch {
+            position: relative; flex-shrink: 0; width: 56px; height: 28px; border-radius: 999px;
+            background: var(--tone-bg); border: 1px solid var(--tone);
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 0 14px var(--tone-glow);
+            transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+        .knob {
+            position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, #ffffff, var(--tone) 70%);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5), 0 0 10px var(--tone-glow);
+            transform: translateX(0);
+            transition: transform 0.3s var(--snap);
+        }
+        .valve-btn.btn-open .knob { transform: translateX(28px); }
+        .valve-btn.is-pending .knob { transform: translateX(14px); } /* halfway while the command is in flight */
+
+        /* --- Alerts --- */
+        #live-alerts { margin-top: 2rem; display: flex; flex-direction: column; gap: 10px; }
+        .alert-item { background: rgba(239, 68, 68, 0.1); border-left: 4px solid var(--danger); padding: 1rem; border-radius: 6px; font-size: 0.9rem; line-height: 1.5; animation: slideIn 0.3s ease-out; }
+        .alert-item.alert-warn { background: rgba(245, 158, 11, 0.1); border-left-color: var(--warn); }
+        .alert-value { color: var(--danger); font-weight: 700; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* --- Table --- */
+        .table-container { overflow-x: auto; max-height: 400px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
+        th { color: var(--text-muted); padding: 1rem; border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; background: rgba(11, 17, 33, 0.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+        td { padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.02); color: var(--text-main); }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        td.empty-row { color: var(--text-muted); text-align: center; padding: 2rem 1rem; }
+
+        @media (max-width: 1050px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 800px) {
+            h1 { font-size: 2.5rem; }
+            .chart-wrap { height: 280px; }
+            .glass-panel { padding: 1.25rem; }
+        }
+
+        @media (max-width: 480px) {
+            .logo { font-size: 1rem; }
+            .live-indicator { font-size: 0.75rem; }
+            .nav-content, .container { padding-left: 1rem; padding-right: 1rem; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .reveal, .step-card { opacity: 1; transform: none; transition: none; }
+            .pulse { animation: none; }
+            .knob { transition: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-content">
+            <div class="logo">🌊 EcoSync Node</div>
+            <div class="live-indicator" id="conn-status" data-state="connecting" role="status" aria-live="polite">
+                <div class="pulse"></div> <span id="conn-text">Connecting…</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Hero Section -->
+        <div class="hero reveal">
+            <div>
+                <div class="badge">IIT Roorkee Hackathon Pitch</div>
+                <h1>Cyber-Physical <br><span class="gradient-text">Water Grid Monitor</span></h1>
+                <p>Detecting municipal pipe bursts and infrastructure anomalies in real-time utilizing a custom C-to-Node.js IoT pipeline.</p>
+                <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 2px;">Scroll to Initialize Dashboard ↓</div>
+            </div>
+        </div>
+
+        <!-- How It Works Section -->
+        <div class="reveal">
+            <h2 style="margin-bottom: 2rem; font-weight: 300;">Architecture <strong style="color: var(--accent);">Overview</strong></h2>
+            <div class="workflow-grid">
+                <div class="step-card reveal delay-1">
+                    <div class="step-icon">🔌</div>
+                    <h3 style="margin-bottom: 0.5rem;">1. Edge Hardware (C)</h3>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5;">Simulates real IoT microcontrollers. Generates continuous water pressure readings and listens for actuation commands.</p>
+                </div>
+                <div class="step-card reveal delay-2">
+                    <div class="step-icon">🐍</div>
+                    <h3 style="margin-bottom: 0.5rem;">2. Data Pipeline (Python)</h3>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5;">Automated ingestion scripts parse raw binary streams in real-time, executing localized anomaly detection logic.</p>
+                </div>
+                <div class="step-card reveal delay-2">
+                    <div class="step-icon">⚡</div>
+                    <h3 style="margin-bottom: 0.5rem;">3. Event Router (Node.js)</h3>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5;">A high-performance Express backend leverages Server-Sent Events (SSE) to broadcast alerts instantly without polling.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Dashboard -->
+        <div class="reveal">
+            <h2 style="margin-bottom: 1.5rem; font-weight: 300;">Live <strong style="color: var(--accent);">Command Center</strong></h2>
+
+            <div class="dashboard-grid">
+                <!-- Left: Chart Panel -->
+                <div class="glass-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1.1rem; color: var(--text-muted);">Real-Time Sensor Telemetry (PSI)</h3>
+                    </div>
+                    <div class="chart-wrap" id="chart-wrap">
+                        <canvas id="gridChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Right: Actuation Panel -->
+                <div class="glass-panel">
+                    <h3 style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 0.5rem;">Actuation Overrides</h3>
+                    <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1.5rem;">Manually trigger shutoff valves to isolate grid sectors during emergencies.</p>
+
+                    <div class="control-group">
+                        <button type="button" class="valve-btn btn-open" id="btn-101" role="switch" aria-checked="true" onclick="toggleValve(101)">
+                            <span class="valve-name">Sector 101 Valve</span>
+                            <span class="valve-state">
+                                <span class="valve-status" id="text-101">FLOWING</span>
+                                <span class="switch" aria-hidden="true"><span class="knob"></span></span>
+                            </span>
+                        </button>
+                        <button type="button" class="valve-btn btn-open" id="btn-102" role="switch" aria-checked="true" onclick="toggleValve(102)">
+                            <span class="valve-name">Sector 102 Valve</span>
+                            <span class="valve-state">
+                                <span class="valve-status" id="text-102">FLOWING</span>
+                                <span class="switch" aria-hidden="true"><span class="knob"></span></span>
+                            </span>
+                        </button>
+                        <button type="button" class="valve-btn btn-open" id="btn-103" role="switch" aria-checked="true" onclick="toggleValve(103)">
+                            <span class="valve-name">Sector 103 Valve</span>
+                            <span class="valve-state">
+                                <span class="valve-status" id="text-103">FLOWING</span>
+                                <span class="switch" aria-hidden="true"><span class="knob"></span></span>
+                            </span>
+                        </button>
+                    </div>
+
+                    <!-- Alert Feed inside panel -->
+                    <div id="live-alerts" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Panel -->
+        <div class="reveal" style="margin-bottom: 5rem;">
+            <div class="glass-panel">
+                <h3 style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 1.5rem;">Anomaly Logs (SQLite Persistence)</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Log ID</th>
+                                <th>Hardware Node</th>
+                                <th>Critical Pressure (PSI)</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table">
+                            <!-- Populates from DB -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Scroll Animations (Intersection Observer) ---
+        const revealElements = document.querySelectorAll('.reveal');
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                    revealObserver.unobserve(entry.target); // Trigger only once
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px 0px -50px 0px" });
+        revealElements.forEach(el => revealObserver.observe(el));
+
+        // --- 2. Shared Helpers ---
+        const SENSOR_IDS = [101, 102, 103]; // index in this array = chart dataset index
+        const MAX_POINTS = 20;              // points kept on screen
+        const ALERT_COOLDOWN_MS = 5000;     // per-sensor gap between breach alerts
+
+        // Accepts epoch seconds, epoch milliseconds, ISO strings and SQLite-style "YYYY-MM-DD HH:MM:SS"
+        function parseTs(ts) {
+            if (ts == null) return new Date();
+            if (typeof ts === 'number' || /^\d+(\.\d+)?$/.test(String(ts).trim())) {
+                const n = Number(ts);
+                return new Date(n < 1e12 ? n * 1000 : n);
+            }
+            return new Date(String(ts).trim().replace(' ', 'T')); // 'T' form also parses in Safari
+        }
+
+        function pushAlert(kind, title, message, highlight) {
+            const feed = document.getElementById('live-alerts');
+            const item = document.createElement('div');
+            item.className = 'alert-item' + (kind === 'warn' ? ' alert-warn' : '');
+
+            const strong = document.createElement('strong');
+            strong.textContent = title;
+            item.append(strong, document.createElement('br'), message);
+            if (highlight) {
+                const value = document.createElement('span');
+                value.className = 'alert-value';
+                value.textContent = highlight;
+                item.append(value, '.');
+            }
+
+            feed.prepend(item);
+            while (feed.children.length > 3) feed.removeChild(feed.lastChild); // Keep top 3
+        }
+
+        // --- 3. Chart.js Setup (Dark Mode Gradients) ---
+        let chart = null;
+        if (typeof Chart === 'undefined') {
+            // CDN unreachable (e.g. offline demo). Everything else keeps working.
+            document.getElementById('chart-wrap').innerHTML =
+                '<p class="chart-fallback">The chart library could not be loaded. Check the internet connection and reload. Valve controls, alerts and logs still work.</p>';
+        } else {
+            Chart.defaults.color = '#64748b';
+            Chart.defaults.font.family = 'Inter';
+            chart = new Chart(document.getElementById('gridChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Node 101', borderColor: '#0ea5e9', backgroundColor: 'rgba(14, 165, 233, 0.1)', data: [], tension: 0.4, fill: true, borderWidth: 2, pointRadius: 0, spanGaps: true },
+                        { label: 'Node 102', borderColor: '#a855f7', backgroundColor: 'rgba(168, 85, 247, 0.1)', data: [], tension: 0.4, fill: true, borderWidth: 2, pointRadius: 0, spanGaps: true },
+                        { label: 'Node 103', borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', data: [], tension: 0.4, fill: true, borderWidth: 2, pointRadius: 0, spanGaps: true }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } } },
+                    scales: {
+                        y: { min: 0, suggestedMax: 70, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { grid: { display: false }, ticks: { maxTicksLimit: 6, maxRotation: 0 } }
+                    }
+                }
+            });
+        }
+
+        // Every dataset stays index-aligned with the labels: a new time slot adds a null to all
+        // three, then the reporting sensor fills its own slot. Sensors that skip a tick leave a gap
+        // (bridged by spanGaps) instead of shifting their line onto the wrong timestamps.
+        function plotReading(sensorIndex, time, psi) {
+            if (!chart) return;
+            const labels = chart.data.labels;
+            if (labels[labels.length - 1] !== time) {
+                labels.push(time);
+                chart.data.datasets.forEach(ds => ds.data.push(null));
+                if (labels.length > MAX_POINTS) {
+                    labels.shift();
+                    chart.data.datasets.forEach(ds => ds.data.shift());
+                }
+            }
+            chart.data.datasets[sensorIndex].data[labels.length - 1] = psi;
+            chart.update('none'); // Update without full animation for performance
+        }
+
+        // --- 4. Connection Status (nav indicator follows the real SSE state) ---
+        const connEl = document.getElementById('conn-status');
+        const connText = document.getElementById('conn-text');
+        const CONN_LABELS = { online: 'System Online', connecting: 'Reconnecting…', offline: 'Offline' };
+        function setConnection(state) {
+            connEl.dataset.state = state;
+            connText.textContent = CONN_LABELS[state];
+        }
+
+        // --- 5. Handle Live Data Stream (SSE) ---
+        const alertedAt = {};
+        let historyTimer = null;
+
+        // One refresh per burst of alerts, delayed slightly so the backend has written the row
+        function scheduleHistoryRefresh() {
+            if (historyTimer) return;
+            historyTimer = setTimeout(() => { historyTimer = null; loadHistory(); }, 500);
+        }
+
+        const eventSource = new EventSource('/api/stream');
+        eventSource.onopen = () => setConnection('online');
+        eventSource.onerror = () => setConnection(eventSource.readyState === EventSource.CLOSED ? 'offline' : 'connecting');
+
+        eventSource.onmessage = (event) => {
+            let data;
+            try { data = JSON.parse(event.data); } catch (e) { return; } // ignore non-JSON messages
+
+            const sensorId = Number(data.sensor_id);
+            const psi = Number(data.pressure_psi);
+            const sensorIndex = SENSOR_IDS.indexOf(sensorId);
+            if (sensorIndex === -1 || !Number.isFinite(psi)) return; // unknown sensor or bad reading
+
+            const time = parseTs(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            plotReading(sensorIndex, time, psi);
+
+            // Trigger Alert UI for pressure drops
+            if (psi < 30 && psi > 0) {
+                const now = Date.now();
+                if (now - (alertedAt[sensorId] || 0) >= ALERT_COOLDOWN_MS) {
+                    alertedAt[sensorId] = now;
+                    pushAlert('danger', '⚠️ Pipeline Breach Detected', `Node ${sensorId} reported sudden drop to `, `${psi.toFixed(1)} PSI`);
+                }
+                scheduleHistoryRefresh(); // Refresh DB table
+            }
+        };
+
+        // --- 6. Two-Way Actuation Logic ---
+        const valveStates = { 101: true, 102: true, 103: true }; // true = flowing
+        const valvePending = { 101: false, 102: false, 103: false };
+
+        function renderValve(sensorId) {
+            const btn = document.getElementById(`btn-${sensorId}`);
+            const txt = document.getElementById(`text-${sensorId}`);
+            const isOpen = valveStates[sensorId];
+            const isPending = valvePending[sensorId];
+
+            btn.classList.toggle('btn-open', isOpen);   // green: FLOWING
+            btn.classList.toggle('btn-shut', !isOpen);  // red: ISOLATED
+            btn.classList.toggle('is-pending', isPending);
+            btn.setAttribute('aria-checked', String(isOpen));
+            btn.setAttribute('aria-busy', String(isPending));
+            txt.textContent = isPending ? 'SENDING' : (isOpen ? 'FLOWING' : 'ISOLATED');
+        }
+
+        async function toggleValve(sensorId) {
+            if (valvePending[sensorId]) return; // ignore clicks while a command is in flight
+
+            const wasOpen = valveStates[sensorId];
+            const action = wasOpen ? 'SHUTOFF' : 'OPEN';
+            valvePending[sensorId] = true;
+            renderValve(sensorId);
+
+            try {
+                const res = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action, sensor_id: sensorId })
+                });
+                if (!res.ok) throw new Error(`server returned ${res.status}`);
+                valveStates[sensorId] = !wasOpen; // only flip once the server accepted the command
+            } catch (err) {
+                pushAlert('warn', 'Valve command failed', `Sector ${sensorId} did not accept ${action} (${err.message}). Valve state unchanged.`);
+            } finally {
+                valvePending[sensorId] = false;
+                renderValve(sensorId);
+            }
+        }
+
+        // --- 7. Load SQLite History ---
+        function historyMessage(text) {
+            document.getElementById('history-table').innerHTML = `<tr><td class="empty-row" colspan="4">${text}</td></tr>`;
+        }
+
+        function loadHistory() {
+            fetch('/api/history')
+                .then(res => {
+                    if (!res.ok) throw new Error(`server returned ${res.status}`);
+                    return res.json();
+                })
+                .then(data => {
+                    if (!Array.isArray(data) || data.length === 0) {
+                        historyMessage('No anomalies logged yet. Pressure drops below 30 PSI will appear here.');
+                        return;
+                    }
+                    const tbody = document.getElementById('history-table');
+                    tbody.innerHTML = data.map(row => {
+                        const dateObj = parseTs(row.timestamp);
+                        const valid = !isNaN(dateObj);
+                        const formattedDate = valid ? dateObj.toLocaleDateString('en-GB') : '—'; // dd/mm/yyyy
+                        const formattedTime = valid ? dateObj.toLocaleTimeString() : '';
+                        const psi = Number(row.pressure_psi);
+
+                        return `
+                            <tr>
+                                <td style="color: var(--text-muted);">#${Number(row.id)}</td>
+                                <td><span style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px;">Node ${Number(row.sensor_id)}</span></td>
+                                <td style="color: var(--danger); font-weight: 600;">${Number.isFinite(psi) ? psi.toFixed(2) : '—'}</td>
+                                <td style="font-family: monospace; color: var(--text-muted);">${formattedDate} &nbsp;${formattedTime}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                })
+                .catch(err => historyMessage(`Could not load anomaly logs (${err.message}). Check that the server is running.`));
+        }
+        loadHistory();
+    </script>
+</body>
+</html>
