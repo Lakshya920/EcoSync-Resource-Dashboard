@@ -26,6 +26,11 @@ app.get('/api/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    
+    // CRITICAL FOR RENDER: Tell the cloud proxy to establish the stream immediately
+    res.flushHeaders(); 
+    res.write(':\n\n'); // Send an invisible heartbeat ping
+    
     connectedClients.push(res);
     req.on('close', () => connectedClients = connectedClients.filter(c => c !== res));
 });
